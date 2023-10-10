@@ -68,11 +68,12 @@ function formatText(text) {
 }
 
 // This function adds music to the input video.
-export async function addMusicToVideo(inputVideoUrl, outputVideoUrl, music) {
+export async function addMusicToVideo(inputVideoUrl, outputVideoUrl, music,volume) {
     return await new Promise((resolve, reject) => {
         ffmpeg()
             .input(inputVideoUrl)
             .input(music)
+            .audioFilter({filter:'volume',options:volume})
             .audioCodec('aac')  // Set the audio codec to AAC
             .toFormat('mp4')  // Set the output format to MP4
             .outputOptions('-shortest')  // Ensure the output video is only as long as the shortest input
@@ -89,6 +90,6 @@ export async function addMusicToVideo(inputVideoUrl, outputVideoUrl, music) {
 //     const outputVideoUrl = 'output.mp4';
 //     const video = await resizeAndPushText(phrases, inputVideoUrl, outputVideoUrl);
 //     console.log(video);
-//     const videoWithMusic = await addMusicToVideo(outputVideoUrl, 'outputWithSound.mp4', './dreams.mp3');
+//     const videoWithMusic = await addMusicToVideo(outputVideoUrl, 'outputWithSound.mp4', './dreams.mp3',0.01);
 //     console.log(videoWithMusic);
 // })();
