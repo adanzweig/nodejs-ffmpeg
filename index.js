@@ -4,7 +4,7 @@ const ffmpeg = require('fluent-ffmpeg');
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);  // Setting the path for the ffmpeg executable
 
 // This function resizes the input video to a given dimension and adds text to it.
-export async function resizeAndPushText(phrases, inputVideoUrl, outputVideoUrl) {
+async function resizeAndPushText(phrases, inputVideoUrl, outputVideoUrl) {
     // Define video filters for cropping, scaling, and trimming the video
     const objectFilters = [{
         filter: 'crop',
@@ -68,10 +68,11 @@ function formatText(text) {
 }
 
 // This function adds music to the input video.
-export async function addMusicToVideo(inputVideoUrl, outputVideoUrl, music,volume) {
+async function addMusicToVideo(inputVideoUrl, outputVideoUrl, music,volume,startTime) {
     return await new Promise((resolve, reject) => {
         ffmpeg()
             .input(inputVideoUrl)
+            .inputOptions([`-itsoffset ${startTime}`])
             .input(music)
             .audioFilter({filter:'volume',options:volume})
             .audioCodec('aac')  // Set the audio codec to AAC
@@ -93,3 +94,7 @@ export async function addMusicToVideo(inputVideoUrl, outputVideoUrl, music,volum
 //     const videoWithMusic = await addMusicToVideo(outputVideoUrl, 'outputWithSound.mp4', './dreams.mp3',0.01);
 //     console.log(videoWithMusic);
 // })();
+module.exports = {
+    addMusicToVideo,
+    resizeAndPushText
+}
