@@ -3,22 +3,28 @@ const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 const ffmpeg = require('fluent-ffmpeg');
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);  // Setting the path for the ffmpeg executable
 
+/**
+ * Trim video short
+ */
+async function trimVideo(inputVideoUrl, outputVideoUrl,duration) {
+    return new Promise((resolve, reject) => {
+        ffmpeg(inputVideoUrl)
+            .setStartTime(0)
+            .setDuration(duration)
+            .toFormat('mp4')
+            .save(outputVideoUrl)
+            .on('end', resolve)
+            .on('error', reject);
+    });
+}
+
 // This function resizes the input video to a given dimension and adds text to it.
 async function resizeAndPushText(phrases, inputVideoUrl, outputVideoUrl) {
     // Define video filters for cropping, scaling, and trimming the video
-    const objectFilters = [{
-        filter: 'crop',
-        options: 'iw:9/16*iw:(iw-ow)/2:(ih-oh)/2'
-    }, {
-        filter: 'scale',
-        options: '1080:1920'
-    }, {
-        filter: 'trim',
-        options: 'start=0:duration=' + 5 * phrases.length
-    }];
+    const objectFilters = [];
 
     // Loop through each phrase and format it for display
-    for (let i = 0; i < phrases.length; i++) {
+    for (let i = 0; i < 5; i++) {
         let newText = formatText(phrases[i]);
         // Add the formatted text as a filter to the video
         objectFilters.push({
@@ -27,24 +33,27 @@ async function resizeAndPushText(phrases, inputVideoUrl, outputVideoUrl) {
                 text: newText,
                 fontfile: 'font.ttf',
                 fontcolor: 'white',
-                fontsize: '100',
+                fontsize: '95',
                 box: 1,
                 boxcolor: 'black@0.8',
                 boxborderw: '5',
                 x: '(w-text_w)/2',
                 y: '(h-text_h)/2',
-                enable: `between(t,${i * 5},${(i * 5) + 5})`
+                enable: `between(t,${(i * 5)},${(i * 5) + 5})`
             }
         })
     }
-
     // Process the video with the defined filters
     const video = await new Promise((resolve, reject) => {
         ffmpeg().input(inputVideoUrl)
+            .addOption('-loglevel', 'debug')
             .videoFilters(objectFilters)
             .save(outputVideoUrl)
             .on('end', resolve)
-            .on('error', reject)
+            .on('error', (error)=>{
+                console.error(error);
+                reject();
+            })
     });
 
     return video;
@@ -64,20 +73,26 @@ function formatText(text) {
         result.push(text.substring(index, endIndex));
         index = endIndex + 1;
     }
-    return result.join("\\\n");  // Join the broken text with newline characters
+    return result.join("\\\n").replace(/'/g,"\'");  // Join the broken text with newline characters
 }
 
-// This function adds music to the input video.
-async function addMusicToVideo(inputVideoUrl, outputVideoUrl, music,volume,startTime) {
-    return await new Promise((resolve, reject) => {
-        ffmpeg()
-            .input(inputVideoUrl)
-            .inputOptions([`-itsoffset ${startTime}`])
-            .input(music)
-            .audioFilter({filter:'volume',options:volume})
-            .audioCodec('aac')  // Set the audio codec to AAC
-            .toFormat('mp4')  // Set the output format to MP4
-            .outputOptions('-shortest')  // Ensure the output video is only as long as the shortest input
+async function addMusicToVideo(inputVideoUrl, outputVideoUrl, soundArray) {
+    return new Promise((resolve, reject) => {
+        let ffmpegCommand = ffmpeg().input(inputVideoUrl);
+        let filterComplex = [];
+
+        soundArray.forEach((soundObject, index) => {
+            ffmpegCommand = ffmpegCommand.input(soundObject.sound);
+            filterComplex.push(`[${index + 1}:a]adelay=${soundObject.itsoffset * 1000}|${soundObject.itsoffset * 1000}[a${index}];[a${index}]volume=${soundObject.volume}[a${index}v]`);
+        });
+
+        let mixedAudio = soundArray.map((_, index) => `[a${index}v]`).join('');
+        filterComplex.push(mixedAudio + 'amix=inputs=' + soundArray.length);
+
+        ffmpegCommand
+            .complexFilter(filterComplex)
+            .audioCodec('aac')
+            .toFormat('mp4')
             .save(outputVideoUrl)
             .on('end', resolve)
             .on('error', reject);
@@ -94,7 +109,9 @@ async function addMusicToVideo(inputVideoUrl, outputVideoUrl, music,volume,start
 //     const videoWithMusic = await addMusicToVideo(outputVideoUrl, 'outputWithSound.mp4', './dreams.mp3',0.01);
 //     console.log(videoWithMusic);
 // })();
+
 module.exports = {
+    resizeAndPushText,
     addMusicToVideo,
-    resizeAndPushText
+    trimVideo
 }
